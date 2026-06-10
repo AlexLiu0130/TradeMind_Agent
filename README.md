@@ -162,6 +162,8 @@ Dashboard 会自动从 `.env` 读取 LLM key（无需额外 export）。确保 I
 
 发布演示材料放在 [`docs/demo`](docs/demo/DEMO_SCRIPT.md)。当前截图资产：
 
+- Demo 视频：[`docs/demo/trademind-demo.mp4`](docs/demo/trademind-demo.mp4)
+
 | Portfolio | Wheel |
 |---|---|
 | ![Portfolio cockpit](docs/demo/screenshots/01-portfolio.jpg) | ![Wheel monitor](docs/demo/screenshots/02-wheel.jpg) |

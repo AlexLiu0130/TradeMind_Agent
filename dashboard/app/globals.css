@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+/* ── TradeMind · "Terminal Instrument" design system ───────────────────────────
+   A precision dark instrument for a daily-driver options trader.
+   Numbers are the hero (IBM Plex Mono); labels engineered (IBM Plex Sans);
+   brass-gold brand accent; emerald/crimson reserved strictly for P&L. */
+
+@theme {
+  --color-base:      #0a0c10;  /* app ink (near-black) */
+  --color-panel:     #111419;  /* card surface */
+  --color-raised:    #161a21;  /* table headers / inset fills */
+  --color-hover:     #1b2027;  /* row & control hover */
+  --color-line:      #232a33;  /* hairline border */
+  --color-ink:       #e6e9ef;  /* primary text */
+  --color-muted:     #8b93a3;  /* secondary text */
+  --color-faint:     #5b6472;  /* tertiary text */
+  --color-gold:      #e0a82e;  /* brand / interactive accent */
+  --color-up:        #3fce8f;  /* profit */
+  --color-down:      #ff5d6c;  /* loss */
+
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", monospace;
+}
+
+html { color-scheme: dark; }
+
+body {
+  background: var(--color-base);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Atmospheric background: a faint instrument grid + warm top glow + fine grain.
+   Fixed, behind everything, pointer-events:none. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 500px at 50% -8%, rgba(224, 168, 46, 0.07), transparent 70%),
+    linear-gradient(to right, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: 100% 100%, 44px 44px, 44px 44px;
+}
+
+/* Tabular monospace numerals — apply to any numeric readout. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Surface primitives. */
+.panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 40%), var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+}
+.panel-accent {
+  box-shadow: 0 0 0 1px rgba(224, 168, 46, 0.12), 0 8px 30px -12px rgba(224, 168, 46, 0.18);
+  border-color: rgba(224, 168, 46, 0.28);
+}
+
+/* Brand wordmark — engineered, wide-tracked. */
+.wordmark {
+  font-family: var(--font-mono);
+  letter-spacing: 0.18em;
+  font-weight: 600;
+}
+
+/* Staggered load reveal. Wrap a region with .stagger; children rise in sequence. */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.stagger > * {
+  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.stagger > *:nth-child(2) { animation-delay: 0.08s; }
+.stagger > *:nth-child(3) { animation-delay: 0.14s; }
+.stagger > *:nth-child(4) { animation-delay: 0.20s; }
+.stagger > *:nth-child(5) { animation-delay: 0.26s; }
+.stagger > *:nth-child(6) { animation-delay: 0.32s; }
+
+/* Live session pulse dot. */
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(63, 206, 143, 0.5); }
+  70%  { box-shadow: 0 0 0 6px rgba(63, 206, 143, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(63, 206, 143, 0); }
+}
+.pulse { animation: pulse-ring 2s ease-out infinite; }
+
+/* Slim, themed scrollbars. */
+* { scrollbar-width: thin; scrollbar-color: var(--color-line) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 8px; }

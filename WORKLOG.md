@@ -45,6 +45,7 @@
   - 新增 `docs/demo/DEMO_SCRIPT.md`、四张 demo 截图资产，以及截图/录屏脚本；系统级录制需 macOS Screen Recording 权限。
   - 新增 `agent/db/seed/trademind_seed.sqlite` 和 `agent/loops/restore_seed_db.py`，让 Serenity 内置样本库可随仓库恢复；seed 不包含 trades/decisions/theses/snapshots。
   - `.gitignore` 补充 DB WAL/SHM、cache、raw replay/batch、临时图片、Flex XML 等不应直接上传的本地运行产物。
+  - 根目录初始化为完整 Git 仓库并发布到 GitHub：`https://github.com/AlexLiu0130/TradeMind_Agent`。
 
 ### 真实数据结果
 - Serenity 档案总记录：**2449** 条。

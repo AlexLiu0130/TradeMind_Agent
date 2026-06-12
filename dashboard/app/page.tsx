@@ -4,7 +4,13 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Cell, ReferenceLine,
 } from "recharts";
+import { MotionConfig, AnimatePresence, motion } from "motion/react";
 import PnlHistory from "@/components/PnlHistory";
+import AnimatedValue from "@/components/AnimatedValue";
+import MarketTrendChart from "@/components/MarketTrendChart";
+import RegimeMatrix from "@/components/RegimeMatrix";
+import GreeksTrend from "@/components/GreeksTrend";
+import EventTimeline from "@/components/EventTimeline";
 import { buildAttentionSignals } from "@/lib/cockpit";
 
 interface Greeks { net_delta: number; net_gamma: number; net_vega: number; net_theta: number; }
@@ -172,8 +178,16 @@ function AdvisorCenter({
             {!loading && cards.length === 0 && (
               <div className="rounded border border-line bg-base p-4 text-xs text-muted">暂无建议。</div>
             )}
+            <AnimatePresence initial={false}>
             {cards.map((card) => (
-              <article key={card.id} className="rounded border border-line bg-base p-3 min-h-[220px]">
+              <motion.article
+                key={card.id}
+                layout
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                className="rounded border border-line bg-base p-3 min-h-[220px]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -239,8 +253,9 @@ function AdvisorCenter({
                     <span className="text-[10px] text-down">{actionState[card.id].error}</span>
                   )}
                 </div>
-              </article>
+              </motion.article>
             ))}
+            </AnimatePresence>
           </div>
         </div>
       </div>
@@ -372,6 +387,7 @@ export default function PortfolioPage() {
   const maxAbs = Math.max(...greeksDefs.map(x => Math.abs(x.value)), 1);
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="space-y-5 stagger">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -414,13 +430,23 @@ export default function PortfolioPage() {
         })}
       </div>
 
-      <AdvisorCenter
-        board={advisor}
-        loading={advisorLoading}
-        error={advisorError}
-        onAction={runAdvisorAction}
-        actionState={advisorActionState}
-      />
+      {/* Event timeline + advisor center (§3.4) */}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 items-start">
+        <EventTimeline />
+        <AdvisorCenter
+          board={advisor}
+          loading={advisorLoading}
+          error={advisorError}
+          onAction={runAdvisorAction}
+          actionState={advisorActionState}
+        />
+      </div>
+
+      {/* Market trends + regime matrix (65/35, §3.2) */}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,13fr)_minmax(0,7fr)] gap-4">
+        <MarketTrendChart />
+        <RegimeMatrix />
+      </div>
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -432,7 +458,9 @@ export default function PortfolioPage() {
         ].map(c => (
           <div key={c.label} className={`panel p-4 ${c.accent ? "panel-accent" : ""}`}>
             <div className="text-muted text-[10px] uppercase tracking-[0.12em] mb-2">{c.label}</div>
-            <div className="num text-2xl font-semibold" style={{ color: c.color }}>{c.value}</div>
+            <div className="num text-2xl font-semibold" style={{ color: c.color }}>
+              <AnimatedValue value={c.value} />
+            </div>
           </div>
         ))}
       </div>
@@ -544,6 +572,9 @@ export default function PortfolioPage() {
         </div>
       </div>
 
+      {/* Greeks trend — current + 7/30d change (§3.3.3) */}
+      <GreeksTrend current={g} />
+
       {/* Positions table */}
       <div className="bg-[#111419] border border-[#232a33] rounded-lg overflow-auto shadow-sm">
         <div className="px-4 py-2.5 border-b border-[#232a33] flex items-center gap-4">
@@ -594,5 +625,6 @@ export default function PortfolioPage() {
       {/* P&L history */}
       <PnlHistory />
     </div>
+    </MotionConfig>
   );
 }

@@ -5,6 +5,95 @@
 
 ---
 
+## [0.15.0] — 2026-06-12 · 市场驾驶舱阶段三~六：环境矩阵 / Greeks 趋势 / 事件时间线 / 动效（§3.2~§3.4 + §6）
+
+### 摘要
+按 `DASHBOARD_MARKET_COCKPIT_DESIGN.md` 完成剩余四个切片：①市场环境矩阵（§3.2 右侧 35%）、②Greeks 趋势 + 风险历史 SQLite 落库（§3.3.3 + §4.1）、③统一事件时间线（§3.4 左侧）、④Motion 动效 + prefers-reduced-motion（§6）。全部走 TDD（纯函数先写失败测试）+ lib/Data/route 三层架构 + missing[] 诚实降级。
+
+### 已完成
+- **市场环境矩阵**：`lib/marketRegime.ts`（6 维度评分：风险偏好/趋势/波动率/科技强弱/利率压力/广度，VIX/^TNX/SPY/QQQ/SMH/RSP 输入，缺数据 → Unknown + 置信度降级）+ `lib/marketRegimeData.ts`（Yahoo 并发拉取，15min TTL）+ `/api/market/regime` + `RegimeMatrix.tsx`（三区横向刻度 + 综合徽章），与 MarketTrendChart 组成 65/35 栅格。
+- **风险历史落库**：`risk_history` 表（schema.sql + 运行时 ensure）；`portfolioData.ts` 在非缓存构建后节流写入（≥10min）：净 Greeks、净/总敞口、单一标的集中度、est 标记；`lib/riskHistory.ts`（trendDelta 7/30d 基线算法 + maxUnderlyingPct）+ `/api/risk/history` + `GreeksTrend.tsx`（4 卡：当前值 + 迷你 sparkline + 7D/30D 变化，历史不足显示"历史积累中"）。
+- **事件时间线**：`lib/events.ts`（DashboardEvent 契约 §4.2 + intel/expiry/earnings/alert 四个 normalizer + mergeEvents 去重排序）+ `lib/eventsData.ts`（intel_items + alert_state + 持仓期权到期 + earnings_calendar.py 持仓财报，earnings 30min TTL、120s 超时）+ `/api/events` + `EventTimeline.tsx`（即将到来/最近分组 + 类型筛选 + missing 提示），与建议中心组成 1/2 栅格。
+- **动效（§6）**：安装 `motion@12.40`；`AnimatedValue.tsx`（KPI 数字 300ms 上滑切换，无 layout shift）；建议卡 AnimatePresence 进出场；页面包 `MotionConfig reducedMotion="user"`；globals.css 加 `prefers-reduced-motion` 禁用 stagger/pulse，stagger 延迟扩到 9+ 子元素。
+- `tsconfig.json` 开 `allowImportingTsExtensions`（node:test strip-types 需要相对 `.ts` 导入）。
+- **独立 reviewer 修复**：earnings 刷新失败时静默回退过期缓存违反 §4.1 → `fetchEarnings` 返回 `{rows, stale}`，`EventsResponse` 增加 `stale[]`，时间线底部金色标注「为过期缓存」；修后实测 `/api/events` events:37 / missing:[] / stale:[]。
+
+### ✅ 验收（实测）
+- 测试：pytest **109 passed**；`node --test lib/*.test.ts` **29 passed**（新增 16：marketRegime 4 + riskHistory 6 + events 6）；`tsc --noEmit` ✅；`eslint` ✅（修 react-hooks/purity：render 期 Date.now() → 服务端 as_of）；`npm run build` ✅。
+- `/api/market/regime` 真实数据：VIX 19.4 → Neutral，6/6 维度有数据。
+- `/api/risk/history`：快照已落库（Δ +5776 / Θ −993 / 集中度 42%），首拍后 GreeksTrend 出现 sparkline。
+- `/api/events`：missing=[] — MU 财报 2026-06-24、NOK 财报 07-23、7 条期权到期（ASTS C100 今天到期 → alert）、intel watch 项。
+- Playwright 截图（新装 chromium）：桌面 1680px 全驾驶舱布局正确；移动 390px 单列堆叠正常；事件时间线分组渲染确认。
+
+### 📌 已知
+- earnings_calendar.py 首跑 ~2min（Nasdaq 日历慢），首次 /api/events 较慢，之后 30min 缓存内秒回。
+- risk_history 刚建表，7/30D 变化需积累相应天数后才显示数值（设计如此，不伪造）。
+
+---
+
+## [0.14.0] — 2026-06-12 · 市场驾驶舱阶段二：市场走势比较图（§3.2）
+
+### 摘要
+按设计文档 §3.2 落地**市场走势比较图**——SPY / QQQ / SMH 归一化涨跌对比（窗口起点 = 0），支持 1M/3M/6M/1Y 时间切换，挂在 Portfolio 页顶部（Attention strip 之下、KPI 之上），让用户先看市场再看组合。组合净值叠加与市场环境矩阵留作后续切片（组合历史净值数据不干净、矩阵是独立块）。
+
+### 已完成
+- **纯数据层** `dashboard/lib/marketSeries.ts`（TDD，先写测试）：
+  - `parseYahooSeries`（解析 chart 时间序列，优先 adjclose、跳 null）。
+  - `buildComparison`（每标的归一化为相对窗口首日的 %，按日期并集对齐，缺失日补 null）。
+  - `SERIES_RANGES` / `SERIES_SYMBOLS`（含线条配色）。
+  - `dashboard/lib/marketSeries.test.ts`：4 用例，`node --test` 全过。
+- **序列聚合** `dashboard/lib/marketSeriesData.ts`：
+  - 并发拉 Yahoo `range&interval` 序列，按 range 内存缓存（TTL 15min，日线稳定）。
+  - 失败标的不伪造，列入 `missing[]`；全失败回退上次快照。
+- **API** `dashboard/app/api/market/series/route.ts`：`?range=1mo|3mo|6mo|1y`，`?fresh=1` 绕缓存。
+- **图表组件** `dashboard/components/MarketTrendChart.tsx`：Recharts LineChart，3 条归一化线（SPY 白 / QQQ 钢蓝 / SMH 紫）、时间切换 tab、图例带各标的最新 %、统一浅色 tooltip（复用 PnlHistory 的 TT 模式）、0 基准线、`missing` 提示、空状态；render 保持纯（loading 只在 `.finally` 设）。
+- 挂到 `app/page.tsx` Portfolio 页顶部。
+
+### ✅ 验收（实测）
+- `/api/market/series?range=3mo` 返回真实对齐序列：64 点、无 missing、起点全 0、终点 SPY +11.07% / QQQ +20.22% / SMH +57.02%（半导体狂飙，与当日 SMH +6.75% 一致）。
+- 浏览器截图确认：3 条归一化线 + 时间切换 + 十字线 tooltip + 图例最新 %，深色终端风格。
+- `node --test lib/*.test.ts`：**13 passed**（含新增 4）。
+- `tsc --noEmit` ✅；`eslint` ✅（修了 `react-hooks/set-state-in-effect`：去掉 effect 内同步 setState）。
+- `npm run build` ✅，`/api/market` + `/api/market/series` 均编译。
+- `pytest`：**109 passed**（本次未碰任何 Python）。
+
+### 设计文档进度
+- 完成：§3.1 顶部市场状态栏、§3.2 市场走势比较图（暂未含组合净值叠加）。
+- 未做：市场环境矩阵、组合净值 vs 基准、Greeks 趋势、§3.4 事件时间线、SQLite 快照持久化、动效与响应式。
+
+---
+
+## [0.13.0] — 2026-06-12 · 市场驾驶舱阶段一：顶部市场状态栏
+
+### 摘要
+按 `DASHBOARD_MARKET_COCKPIT_DESIGN.md` 第一阶段落地**顶部市场状态栏**——Dashboard 此前完全没有市场环境上下文。状态栏在所有页面顶部展示 SPY / QQQ / SMH / VIX / US10Y / DXY + 交易时段 + 数据新鲜度，直接服务设计文档目标①（市场风险偏好/中性/避险）。复用现有缓存与测试约定，未重建任何东西。
+
+### 已完成
+- **纯数据层** `dashboard/lib/market.ts`（TDD，先写测试）：
+  - `changePct` / `parseYahooChart` / `marketSession`（ET 盘前/盘中/盘后/休市）/ `freshness`（live/delayed/stale/none）。
+  - 6 个锚定标的配置 `MARKET_SYMBOLS`（含 Yahoo symbol：`^VIX` / `^TNX` / `DX-Y.NYB`）。
+  - `dashboard/lib/market.test.ts`：5 个用例，`node --test` 全过。
+- **行情聚合** `dashboard/lib/marketData.ts`：
+  - 并发拉 Yahoo chart endpoint，**复用 `portfolioData.ts` 的模块缓存 + 同一个 `ibkr_cache_ttl` 知障**（Settings 的"实时/缓存"开关同时管市场数据）。
+  - 失败标的留 `null` + `ok:false`，**绝不伪造 0**；全部失败且有旧快照时回退 stale。
+- **API** `dashboard/app/api/market/route.ts`：薄路由，`?fresh=1` 绕缓存。
+- **组件** `dashboard/components/MarketStatusBar.tsx`：客户端，60s 轮询，深色终端风格（`.num` 等宽、涨绿跌红、不闪烁），仅 import 纯函数（不引 server-only 模块）；render 保持纯（时间/新鲜度在 fetch 回调算好存 state）。
+- 挂载到 `app/layout.tsx`，Nav 之上，全页面可见。
+
+### ✅ 验收（实测）
+- `/api/market` 返回真实 Yahoo 数据：SPY 737.76(+1.70%) / QQQ(+3.38%) / SMH(+6.75%) / VIX 19.44(-2.16%) / US10Y 4.46%(-1.74%) / DXY 99.75，全部 `ok:true`，无伪造 0。
+- 浏览器截图确认状态栏渲染：时段 dot、6 标的、涨跌色、右侧新鲜度 dot + ET 更新时间。
+- `node --test lib/*.test.ts`：**9 passed**（含新增 5）。
+- `tsc --noEmit` ✅；`eslint` ✅（修了 React 19 `react-hooks/purity`：把 `Date.now()` 移出 render）。
+- `npm run build` ✅，`/api/market` 已编译。
+- `pytest`：**108 passed**；`test_same_round_tool_calls_are_dispatched_concurrently` 全量跑偶发失败、**单独跑 3/3 通过**——并发计时 flaky，本次未改任何 Python，与本改动无关。
+
+### 设计文档进度
+- 完成：阶段一关键件「顶部市场状态栏」（§3.1）。
+- 未做（后续阶段，体量更大）：市场走势比较图（§3.2）、市场环境矩阵、组合净值 vs 基准、Greeks 趋势、统一事件时间线、分钟级快照持久化到 SQLite。
+
+---
+
 ## [设计] — 2026-06-12 · Dashboard 市场驾驶舱工作方案
 
 ### 摘要

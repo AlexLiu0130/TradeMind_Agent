@@ -153,6 +153,24 @@ CREATE TABLE IF NOT EXISTS advisor_reminders (
 
 CREATE INDEX IF NOT EXISTS advisor_reminders_due ON advisor_reminders(status, due_at);
 
+-- portfolio risk snapshots (§4.1: 定时快照入库，不能只保存在浏览器状态中)。
+-- Written by the dashboard on live portfolio builds, throttled to ≥10 min.
+CREATE TABLE IF NOT EXISTS risk_history (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts              TEXT NOT NULL,           -- ISO UTC
+  net_delta       REAL,
+  net_gamma       REAL,
+  net_vega        REAL,
+  net_theta       REAL,
+  net_usd         REAL,
+  gross_usd       REAL,
+  max_single_pct  REAL,                    -- largest underlying % of gross
+  greeks_estimated INTEGER DEFAULT 0,      -- 1 = BS-model fallback, not IBKR
+  source          TEXT NOT NULL DEFAULT 'dashboard'
+);
+
+CREATE INDEX IF NOT EXISTS risk_history_ts ON risk_history(ts);
+
 -- seed rules (INSERT OR IGNORE = idempotent)
 INSERT OR IGNORE INTO rules (key, value) VALUES ('max_single_pct', '30');
 INSERT OR IGNORE INTO rules (key, value) VALUES ('max_rolls', '2');

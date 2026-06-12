@@ -85,6 +85,9 @@ body::before {
 .stagger > *:nth-child(4) { animation-delay: 0.20s; }
 .stagger > *:nth-child(5) { animation-delay: 0.26s; }
 .stagger > *:nth-child(6) { animation-delay: 0.32s; }
+.stagger > *:nth-child(7) { animation-delay: 0.38s; }
+.stagger > *:nth-child(8) { animation-delay: 0.44s; }
+.stagger > *:nth-child(n+9) { animation-delay: 0.5s; }
 
 /* Live session pulse dot. */
 @keyframes pulse-ring {
@@ -93,6 +96,13 @@ body::before {
   100% { box-shadow: 0 0 0 0 rgba(63, 206, 143, 0); }
 }
 .pulse { animation: pulse-ring 2s ease-out infinite; }
+
+/* §6: honor OS-level reduced-motion for CSS animations (Motion components
+   handle this via MotionConfig reducedMotion="user"). */
+@media (prefers-reduced-motion: reduce) {
+  .stagger > * { animation: none; }
+  .pulse { animation: none; }
+}
 
 /* Slim, themed scrollbars. */
 * { scrollbar-width: thin; scrollbar-color: var(--color-line) transparent; }

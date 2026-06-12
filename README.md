@@ -27,6 +27,7 @@ TradeMind 在一套**只读** IBKR 数据脚本（[`ibkr-options-assistant`](htt
 | 🛡️ **安全门禁 Guardrail** | 任何交易意图先过 7 项预交易检查（IV / 财报 / 组合 Greeks / 集中度 / 滚动上限 / 每日上限 / FOMO） |
 | 📓 **记忆层** | SQLite 存交易假设（thesis）、决策日志、风控规则、历史快照、Flex 成交 |
 | 📊 **Dashboard** | 深色金融终端 UI：实时组合 / Greeks / 市场暴露 / Wheel / Intel / 交易 / 分析 / Thesis / 设置 + 内嵌 Agent 对话面板 |
+| 🛩️ **市场驾驶舱** | 全局市场状态栏（SPY/QQQ/SMH/VIX/10Y/DXY）、SPY·QQQ·SMH 归一化走势比较、6 维市场环境矩阵、Greeks 7/30 日趋势（SQLite 落库）、统一事件时间线（财报/到期/情报/风险） |
 | 🧩 **Agent Committee** | 主动建议中心：组合风险、Serenity 档案、价格反馈、提醒队列协作生成“建议卡”，只建议不越权决策 |
 | 📰 **Serenity 档案** | 内置 `@aleabitoreddit` Serenity 推文档案，按发帖时间展示，提取 ticker、中文解读、细分行业与发帖后涨跌幅 |
 | 🔍 **Serenity Lens** | 从档案中蒸馏“思维框架”，学习研究模式而不是照搬原帖结论 |
@@ -148,7 +149,7 @@ Dashboard 会自动从 `.env` 读取 LLM key（无需额外 export）。确保 I
 
 | 页面 | 内容 |
 |---|---|
-| **Portfolio** | 实时市值 / 未实现盈亏 / 净 Delta / Theta；**Market Exposure**（多空美元敞口）；Greeks（缺数据时本地 BS 估算并标注）；逐仓位盈亏；P&L 历史；Agent Committee 主动建议卡 |
+| **Portfolio** | 顶部市场状态栏 + 注意力信号；事件时间线 + Agent Committee 主动建议卡；Market Trends（SPY/QQQ/SMH 归一化比较，1M~1Y）+ Market Regime（风险偏好/趋势/波动率/科技强弱/利率/广度 6 维评分）；实时市值 / 未实现盈亏 / 净 Delta / Theta；**Market Exposure**（多空美元敞口）；Greeks 当前值 + 7/30 日趋势 sparkline（缺数据时本地 BS 估算并标注）；逐仓位盈亏；P&L 历史 |
 | **Wheel** | 从实时 option positions 派生 Wheel legs，按 DTE / IV / ITM / P&L 标记 OK、Watch、Risk，并复用 Portfolio 缓存快速加载 |
 | **Intel** | Serenity 档案：按发帖时间排序，展示正文、中文解读、相关 ticker、细分行业、发帖基准价、最新价、至今涨跌幅；支持 HAR/JSON/TXT/截图导入 |
 | **Trades** | 历史成交（Flex 导入），可按标的/类型筛选 |
@@ -160,28 +161,28 @@ Dashboard 会自动从 `.env` 读取 LLM key（无需额外 export）。确保 I
 
 ### Demo
 
-发布演示材料放在 [`docs/demo`](docs/demo/DEMO_SCRIPT.md)。当前截图资产：
+发布演示材料放在 [`docs/demo`](docs/demo/DEMO_SCRIPT.md)。当前资产（2026-06-12，含市场驾驶舱）：
 
-- Demo 视频：[`docs/demo/trademind-demo.mp4`](docs/demo/trademind-demo.mp4)
+- Demo 视频（~46s 页面巡游）：[`docs/demo/trademind-demo.mp4`](docs/demo/trademind-demo.mp4)
 
-| Portfolio | Wheel |
+| Portfolio · 事件时间线 + 建议中心 | 市场驾驶舱 · Trends + Regime |
 |---|---|
-| ![Portfolio cockpit](docs/demo/screenshots/01-portfolio.jpg) | ![Wheel monitor](docs/demo/screenshots/02-wheel.jpg) |
+| ![Portfolio cockpit](docs/demo/screenshots/01-portfolio.jpg) | ![Market cockpit](docs/demo/screenshots/05-cockpit-greeks-events.jpg) |
 
-| Serenity Intel | Showcase |
+| Wheel | Serenity Intel |
 |---|---|
-| ![Serenity archive](docs/demo/screenshots/03-intel.jpg) | ![Showcase page](docs/demo/screenshots/04-showcase.jpg) |
+| ![Wheel monitor](docs/demo/screenshots/02-wheel.jpg) | ![Serenity archive](docs/demo/screenshots/03-intel.jpg) |
 
-如需重新生成截图（需要 macOS 屏幕录制权限；当前仓库已包含一组通过 in-app Browser 生成的截图资产）：
+| Showcase |
+|---|
+| ![Showcase page](docs/demo/screenshots/04-showcase.jpg) |
+
+重新生成全部 demo 资产（截图 + 视频，Playwright 无头浏览器，无需 macOS 录屏权限；先确保 dev server 在跑、API 缓存已预热）：
 
 ```bash
-scripts/capture_demo_screenshots.sh
-```
-
-如需尝试本机录屏（同样需要 macOS 屏幕录制权限）：
-
-```bash
-scripts/record_demo.sh docs/demo/trademind-demo.mp4
+cd dashboard && node ../scripts/capture_demo_assets.mjs
+# webm → mp4：
+ffmpeg -i docs/demo/.video_tmp/page@*.webm -c:v libx264 -pix_fmt yuv420p docs/demo/trademind-demo.mp4
 ```
 
 ### 当前内置数据
@@ -263,12 +264,23 @@ TradeMind_Agent/
 │   │   ├── wheel/page.tsx            # Wheel Monitor
 │   │   ├── intel/page.tsx            # Serenity 档案、Lens、导入界面
 │   │   ├── showcase/page.tsx         # Demo / portfolio review 页面
-│   │   └── api/                      # Next.js API：positions、wheel、intel、advisor、chat...
-│   ├── components/                   # Nav、Agent Chat、P&L history
+│   │   └── api/                      # Next.js API：positions、wheel、intel、advisor、chat、
+│   │                                 #   market/regime、risk/history、events...
+│   ├── components/                   # Nav、Agent Chat、P&L history、市场驾驶舱组件
+│   │   ├── MarketStatusBar.tsx       # §3.1 全局市场状态条
+│   │   ├── MarketTrendChart.tsx      # §3.2 SPY/QQQ/SMH 归一化走势比较
+│   │   ├── RegimeMatrix.tsx          # §3.2 市场环境矩阵（6 维度 + 综合置信度）
+│   │   ├── GreeksTrend.tsx           # §3.3.3 Greeks 当前值 + 7/30 日变化 + 迷你趋势线
+│   │   ├── EventTimeline.tsx         # §3.4 统一事件时间线（财报/到期/情报/风险）
+│   │   └── AnimatedValue.tsx         # §6 KPI 数字切换动效（Motion）
 │   └── lib/
-│       ├── portfolioData.ts          # 共享 Portfolio dashboard TTL cache
+│       ├── portfolioData.ts          # 共享 Portfolio dashboard TTL cache（含风险快照落库）
 │       ├── wheel.ts                  # Wheel cards 纯函数转换
 │       ├── portfolioMath.ts          # Black-Scholes Greeks 估算 + market exposure
+│       ├── marketRegime.ts           # 市场环境评分纯函数（TDD）
+│       ├── riskHistory.ts            # 风险趋势 delta + 集中度纯函数（TDD）
+│       ├── events.ts                 # DashboardEvent 契约 + 各源 normalizer（TDD）
+│       ├── *Data.ts                  # 各模块网络/SQLite 聚合层（TTL 缓存 + missing[] 降级）
 │       └── intel.ts                  # ticker 中文名称与细分行业映射
 └── tests/                            # pytest；当前 109 Python tests
 ```

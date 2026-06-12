@@ -10,8 +10,9 @@ Show TradeMind as a practical trading cockpit: live portfolio risk, fast Wheel m
 
 1. Portfolio Cockpit
    - URL: `http://localhost:3000/`
-   - Show KPI strip, live portfolio state, market exposure, and Agent Committee.
-   - Message: TradeMind turns IBKR data into a disciplined daily operating screen.
+   - Show the global market status bar (SPY/QQQ/SMH/VIX/10Y/DXY), attention strip, KPI cards, Event Timeline (earnings/expiry/intel/risk), and Agent Committee.
+   - Scroll to Market Trends (SPY/QQQ/SMH normalized comparison) + Market Regime (6-dimension scoring), then Greeks trend cards with 7D/30D deltas backed by SQLite risk history.
+   - Message: TradeMind turns IBKR + market data into a disciplined daily operating screen — market first, then portfolio.
 
 2. Wheel Monitor
    - URL: `http://localhost:3000/wheel`
@@ -33,7 +34,14 @@ Show TradeMind as a practical trading cockpit: live portfolio risk, fast Wheel m
    - Show the product story: ask, plan, check, decide, remember.
    - Message: Agent can suggest and organize evidence, but never trades autonomously.
 
+## Regenerating Assets
+
+```bash
+cd dashboard && node ../scripts/capture_demo_assets.mjs   # headless Playwright; warm API caches first
+```
+
 ## Key Claims To Mention
+- Market cockpit: status bar, normalized trend comparison, regime matrix, Greeks history, and a unified event timeline — all honest-data (missing/stale flagged, never faked zeros).
 - Agent tools now run concurrently and are guarded by fail-closed checks.
 - Wheel hot path is backed by shared Portfolio cache.
 - Serenity archive has 2449 records and historical price reaction for most mapped ticker references.

@@ -2,6 +2,7 @@ import { execFileSync } from "child_process";
 import path from "path";
 import { getDb } from "@/lib/db";
 import { enrich, type Position } from "@/lib/portfolioMath";
+import { recordRiskSnapshot } from "@/lib/riskHistoryData";
 
 let cache: { ts: number; data: Record<string, unknown> } | null = null;
 
@@ -64,7 +65,10 @@ export function getPortfolioDashboard(options: { fresh?: boolean } = {}): {
   }
 
   const dashboard = buildDashboard();
-  if (dashboard) cache = { ts: now, data: dashboard };
+  if (dashboard) {
+    cache = { ts: now, data: dashboard };
+    recordRiskSnapshot(dashboard); // throttled internally (≥10 min)
+  }
   if (!dashboard && cache) {
     return { dashboard: cache.data, cached: true, stale: true };
   }

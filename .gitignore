@@ -1,21 +1,51 @@
+# ── 数据库（持仓/记忆，永远不入库）──────────────────────
 agent/db/trademind.db
 agent/db/trademind.db-shm
 agent/db/trademind.db-wal
 agent/db/trademind.sqlite
+agent/db/*.db
+agent/db/*.sqlite
+
+# ── 运行时产物 ────────────────────────────────────────────
 agent/db/cache/
 agent/db/intel_media/
 agent/db/serenity_api_replay/
 agent/db/serenity_batches/
 agent/db/*.png
+output/
+*.log
+*.log.*
+
+# ── Python ────────────────────────────────────────────────
 *.pyc
 __pycache__/
+*.pyo
+.venv/
+venv/
+
+# ── 环境与密钥（最高优先级）──────────────────────────────
 .env
 *.env
-.DS_Store
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# ── IBKR 本地文件 ─────────────────────────────────────────
 alex.xml
+*.xml
+flex_*.csv
+
+# ── macOS / 系统 ──────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+
+# ── 工具链产物 ────────────────────────────────────────────
 dashboard/.git-dashboard-backup/
+dashboard/json
 .claude/
 .superpowers/
 pet_runs/
 config.toml.before-*
-dashboard/json

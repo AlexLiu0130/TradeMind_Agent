@@ -9,7 +9,7 @@ def test_responses_schema_is_flat_and_complete():
     assert names == {
         "gather_research", "assess_risk", "suggest_strategy", "check_guardrail",
         "get_thesis_history", "search_knowledge", "get_behavior_profile",
-        "analyze_serenity_lens", "get_agent_advice",
+        "analyze_serenity_lens", "get_agent_advice", "get_gamma_exposure",
     }
     for t in schema:
         assert t["type"] == "function"

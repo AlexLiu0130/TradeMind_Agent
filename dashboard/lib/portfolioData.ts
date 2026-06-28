@@ -31,7 +31,7 @@ function runStatusDashboard(): Record<string, unknown> | null {
   try {
     const out = execFileSync("python3", [path.join(SCRIPTS, "status_dashboard.py"), "--output", "json"], {
       env: { ...process.env, PYTHONPATH },
-      timeout: 30000,
+      timeout: 60000,
       stdio: ["ignore", "pipe", "ignore"],
     });
     return JSON.parse(out.toString());

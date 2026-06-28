@@ -5,6 +5,45 @@
 
 ---
 
+## [0.16.0] — 2026-06-28 · Dealer Gamma Exposure (GEX) + 项目规范化
+
+### 摘要
+新增 **Gamma Exposure 页面**：从 IBKR 实时拉取期权 model Greeks（`genericTickList="106"`），按 strike 聚合 Dealer GEX，输出 Call Wall（阻力）/ Put Wall（支撑）/ Gamma Flip（零轴切换价）/ 正负 Gamma 环境判断。支持 **EOD 快照**（3:50 PM ET 自动保存，盘后复盘可用），dashboard 会自动在 live 数据不可用时回退到当日快照。同步完成项目规范化：根目录 CLAUDE.md（AI agent token 约定）、规划文档归档、README 补全发布说明。
+
+### 已完成
+
+**GEX 脚本（ibkr-options-assistant）**
+- `scripts/gamma_exposure.py`：`CLIENT_ID_OFFSET=21`，`req_historical_safe()` 拿 spot（绕过 ARCA 10089），`snapshot=True` + stall 检测（8s 无新 Greek 停止），GEX 公式：`(call_oi × call_γ − put_oi × put_γ) × 100 × spot`；输出含 `gex_env / call_wall / put_wall / gamma_flip / by_strike[]`
+- 盘外明确报错："Model Greeks require live/delayed option quotes — run during ET 09:30–16:00"
+
+**TradeMind 集成**
+- `agent/tool_registry.py`：注册 `get_gamma_exposure` 工具（15min TTL）
+- `dashboard/app/api/gamma/route.ts`：15min in-process cache → EOD 文件回退 → 503；`TRADEMIND_ROOT` 定位快照目录
+- `dashboard/app/gamma/page.tsx`：KPI 卡（Gamma Env / Call Wall / Put Wall / Gamma Flip）+ Net GEX / Cumulative GEX Recharts 图，ReferenceLine 标注 Spot / CW / PW / Flip
+- `dashboard/components/Nav.tsx`：加 Gamma 导航项
+
+**EOD 快照**
+- `agent/loops/save_gex_snapshot.py`：原子写（tmp → rename），`GEX_TICKERS` env 控制覆盖标的，可选 Telegram 推送；cron 3:50 PM ET Mon-Fri
+- `agent/db/gex/`：快照目录（.gitignore 排除）
+- `.env.example`：加 `TRADEMIND_ROOT` / `GEX_TICKERS`
+
+**项目规范化**
+- 新增 `CLAUDE.md`：AI agent token 节约规范、常见操作检查清单
+- `AGENTS.md`：加"Token 节约约定"章节，更新架构速览
+- 规划文档（`IMPROVEMENT_PLAN*.md`、`DASHBOARD_MARKET_COCKPIT_DESIGN.md`、`TradeMind_Agent_项目计划.md`）归入 `docs/internal/`
+- `README.md`：加 Gamma 页说明、补 EOD cron 示例、修 git clone URL
+
+### ✅ 验收
+- `pytest tests/ -q`：全量通过（无新 Python 测试，现有 109 passed）
+- `tsc --noEmit`：通过（TypeScript 类型全部正确）
+- 盘外测试：spot 价格正常（historical safe），Greeks 0/N 符合预期（盘外无 model Greeks 是正常行为）
+
+### 📌 已知
+- GEX Greeks + OI 完整验证需在 ET 09:30–16:00 实测（盘外永远 0）
+- EOD 快照首次运行需市场开放时才能拿到有效数据
+
+---
+
 ## [0.15.0] — 2026-06-12 · 市场驾驶舱阶段三~六：环境矩阵 / Greeks 趋势 / 事件时间线 / 动效（§3.2~§3.4 + §6）
 
 ### 摘要

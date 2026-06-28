@@ -103,7 +103,7 @@ flowchart LR
 ### 1. 安装
 
 ```bash
-git clone <repo> && cd TradeMind_Agent
+git clone https://github.com/AlexLiu0130/TradeMind_Agent.git && cd TradeMind_Agent
 pip install -r requirements.txt          # Python: openai
 cd dashboard && npm install && cd ..      # 前端依赖
 ```
@@ -136,9 +136,11 @@ Dashboard 会自动从 `.env` 读取 LLM key（无需额外 export）。确保 I
 ### 4.（可选）自主调度
 
 ```bash
-# crontab 示例（ET 时间，注意夏令时换算）
-0 13 * * 1-5  cd ~/Desktop/TradeMind_Agent && python3 -m agent.loops.premarket_brief
-30 20 * * 1-5 cd ~/Desktop/TradeMind_Agent && python3 -m agent.loops.daily_review
+# crontab 示例（ET 时间，注意夏令时换算；以下均为 UTC 时间）
+0  13 * * 1-5  cd ~/Desktop/TradeMind_Agent && python3 -m agent.loops.premarket_brief   # 09:00 ET
+50 19 * * 1-5  cd ~/Desktop/TradeMind_Agent && GEX_TICKERS=SPY,QQQ python3 -m agent.loops.save_gex_snapshot  # 15:50 ET（夏令时）
+50 20 * * 1-5  cd ~/Desktop/TradeMind_Agent && GEX_TICKERS=SPY,QQQ python3 -m agent.loops.save_gex_snapshot  # 15:50 ET（冬令时）
+30 20 * * 1-5  cd ~/Desktop/TradeMind_Agent && python3 -m agent.loops.daily_review     # 16:30 ET
 ```
 
 ---
@@ -151,6 +153,7 @@ Dashboard 会自动从 `.env` 读取 LLM key（无需额外 export）。确保 I
 |---|---|
 | **Portfolio** | 顶部市场状态栏 + 注意力信号；事件时间线 + Agent Committee 主动建议卡；Market Trends（SPY/QQQ/SMH 归一化比较，1M~1Y）+ Market Regime（风险偏好/趋势/波动率/科技强弱/利率/广度 6 维评分）；实时市值 / 未实现盈亏 / 净 Delta / Theta；**Market Exposure**（多空美元敞口）；Greeks 当前值 + 7/30 日趋势 sparkline（缺数据时本地 BS 估算并标注）；逐仓位盈亏；P&L 历史 |
 | **Wheel** | 从实时 option positions 派生 Wheel legs，按 DTE / IV / ITM / P&L 标记 OK、Watch、Risk，并复用 Portfolio 缓存快速加载 |
+| **Gamma** | Dealer Gamma Exposure (GEX) 分析：Call Wall（阻力）/ Put Wall（支撑）/ Gamma Flip（多空切换价）/ 正负 Gamma 环境判断；支持 EOD 快照盘后复盘 |
 | **Intel** | Serenity 档案：按发帖时间排序，展示正文、中文解读、相关 ticker、细分行业、发帖基准价、最新价、至今涨跌幅；支持 HAR/JSON/TXT/截图导入 |
 | **Trades** | 历史成交（Flex 导入），可按标的/类型筛选 |
 | **Analytics** | 按持有期/时段的胜率、按标的的已实现盈亏 |

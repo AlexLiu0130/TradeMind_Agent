@@ -13,6 +13,7 @@ from agent import behavior, knowledge
 from agent.agents import advisor, research, risk, serenity_lens, strategy
 from agent.guardrail import check_trade
 from agent.journal_store import list_theses
+from agent.tools import run_script
 
 
 @dataclass(frozen=True)
@@ -70,6 +71,22 @@ def _analyze_serenity_lens(inp: dict) -> dict:
 
 def _get_agent_advice(inp: dict) -> dict:
     return advisor.build_advice(intel_limit=inp.get("intel_limit", 120))
+
+
+def _get_gamma_exposure(inp: dict) -> dict:
+    ticker = inp["ticker"]
+    dte_max = str(inp.get("dte_max", 45))
+    strikes = str(inp.get("strikes", 20))
+    result = run_script(
+        "gamma_exposure.py", ticker,
+        "--dte-max", dte_max,
+        "--strikes", strikes,
+        timeout=180,
+        ttl=900,  # cache 15 min
+    )
+    if result is None:
+        return {"error": f"GEX fetch failed for {ticker} — may be outside market hours or Gateway offline"}
+    return result
 
 
 # ── registry ──────────────────────────────────────────────────────────────────
@@ -176,6 +193,26 @@ TOOLS: list[Tool] = [
             "required": ["query"],
         },
         handler=_analyze_serenity_lens,
+    ),
+    Tool(
+        name="get_gamma_exposure",
+        description=(
+            "Fetch Dealer Gamma Exposure (GEX) for a ticker from IBKR. "
+            "Returns: gex_env (positive/negative), call_wall (resistance), put_wall (support), "
+            "gamma_flip (regime switch price), total_gex, and per-strike breakdown. "
+            "Requires market hours (ET 09:30–16:00) for model Greeks. "
+            "Use for: judging if market is in stabilizing (positive gamma) vs amplifying (negative gamma) regime."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "ticker": {"type": "string", "description": "Underlying ticker, e.g. SPY, QQQ, NVDA"},
+                "dte_max": {"type": "integer", "description": "Max days to expiration (default 45)"},
+                "strikes": {"type": "integer", "description": "Strikes per side of ATM (default 20)"},
+            },
+            "required": ["ticker"],
+        },
+        handler=_get_gamma_exposure,
     ),
     Tool(
         name="get_agent_advice",

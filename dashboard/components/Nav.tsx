@@ -6,6 +6,7 @@ import { useAgent } from "./AgentContext";
 const links = [
   { href: "/", label: "Portfolio" },
   { href: "/wheel", label: "Wheel" },
+  { href: "/gamma", label: "Gamma" },
   { href: "/alerts", label: "Alerts" },
   { href: "/intel", label: "Intel" },
   { href: "/trades", label: "Trades" },

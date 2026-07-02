@@ -1,18 +1,8 @@
 import { getWriteDb } from "@/lib/db";
 import { analyzeIntelText, emptyTickerSnapshot, type TickerSnapshot } from "@/lib/intel";
 import { extractSerenityPostsFromPayload } from "@/lib/intelImport";
+import { fetchQuotes } from "@/lib/quotes";
 import { NextRequest, NextResponse } from "next/server";
-import { execFileSync } from "child_process";
-import path from "path";
-
-const SCRIPTS = path.join(
-  process.env.IBKR_SCRIPTS_DIR ||
-    path.join(process.env.HOME || "~", "Desktop/ibkr-options-assistant/scripts"),
-);
-const PYTHONPATH =
-  process.env.PYTHONPATH ||
-  path.join(process.env.HOME || "~", "Desktop/AI量化/futures_quant/.venv/lib/python3.13/site-packages");
-const QUOTE_LIMIT = 16;
 
 function ensureIntelSchema(db: ReturnType<typeof getWriteDb>) {
   db.exec(`
@@ -56,44 +46,9 @@ function ensureIntelSchema(db: ReturnType<typeof getWriteDb>) {
   }
 }
 
-function extractPrices(data: unknown): Record<string, number> {
-  const prices: Record<string, number> = {};
-  const visit = (value: unknown, keyHint?: string) => {
-    if (!value || typeof value !== "object") return;
-    if (Array.isArray(value)) {
-      for (const item of value) visit(item);
-      return;
-    }
-    const obj = value as Record<string, unknown>;
-    const sym = String(obj.symbol || obj.ticker || obj.underlying || keyHint || "").toUpperCase();
-    const price = Number(obj.last || obj.last_price || obj.price || obj.market_price || obj.close || obj.mid);
-    if (sym && Number.isFinite(price) && price > 0) prices[sym] = price;
-    for (const [k, v] of Object.entries(obj)) {
-      if (v && typeof v === "object") visit(v, k.toUpperCase());
-    }
-  };
-  visit(data);
-  return prices;
-}
-
-function runQuotes(tickers: string[]): Record<string, number> {
-  const selected = [...new Set(tickers.map((t) => t.toUpperCase()).filter(Boolean))].slice(0, QUOTE_LIMIT);
-  if (selected.length === 0) return {};
-  try {
-    const out = execFileSync("python3", [path.join(SCRIPTS, "market_quote.py"), ...selected], {
-      env: { ...process.env, PYTHONPATH },
-      timeout: 35000,
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    return extractPrices(JSON.parse(out.toString()));
-  } catch {
-    return {};
-  }
-}
-
-function buildTickerSnapshot(tickers: string[]): Record<string, TickerSnapshot> {
+async function buildTickerSnapshot(tickers: string[]): Promise<Record<string, TickerSnapshot>> {
   const pending = emptyTickerSnapshot(tickers);
-  const quotes = runQuotes(tickers);
+  const quotes = await fetchQuotes(tickers);
   for (const t of tickers) {
     const current = quotes[t];
     if (current) pending[t] = { baseline: current, current, since_pct: 0, source: "quote" };
@@ -133,6 +88,10 @@ export async function POST(req: NextRequest) {
   ensureIntelSchema(db);
   const inserted: number[] = [];
   const now = new Date().toISOString();
+  const prepared = await Promise.all(posts.map(async (post) => {
+    const analysis = analyzeIntelText(post.text);
+    return { post, analysis, snapshot: await buildTickerSnapshot(analysis.related_tickers) };
+  }));
 
   const insert = db.prepare(
     `INSERT INTO intel_items
@@ -143,9 +102,7 @@ export async function POST(req: NextRequest) {
   );
 
   const tx = db.transaction(() => {
-    for (const post of posts) {
-      const analysis = analyzeIntelText(post.text);
-      const snapshot = buildTickerSnapshot(analysis.related_tickers);
+    for (const { post, analysis, snapshot } of prepared) {
       const info = insert.run(
         now,
         "Serenity",

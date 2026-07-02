@@ -73,14 +73,14 @@ def test_iv_unknown_when_ibkr_unavailable(fresh_db):
 
 def test_earnings_within_window_blocks(fresh_db):
     earnings_data = [{"date": "2026-06-10", "ticker": "AAPL"}]
-    with patch("agent.guardrail.run_script", side_effect=_make_run({"earnings_calendar": earnings_data})):
+    with patch("agent.guardrail.fetch_earnings", return_value=earnings_data):
         check = _check_earnings("AAPL", {"block_earnings_within_days": "2"})
     assert check["blocking"] is True
     assert "2026-06-10" in check["conclusion"]
 
 
 def test_earnings_outside_window_ok(fresh_db):
-    with patch("agent.guardrail.run_script", return_value=[]):
+    with patch("agent.guardrail.fetch_earnings", return_value=[]):
         check = _check_earnings("AAPL", {"block_earnings_within_days": "2"})
     assert check["blocking"] is False
 
@@ -192,13 +192,13 @@ def test_fomo_small_move_passes(fresh_db):
 # ── full check_trade integration ──────────────────────────────────────────────
 
 def test_check_trade_requires_confirmation_always(fresh_db):
-    with patch("agent.guardrail.run_script", return_value=None):
+    with patch("agent.guardrail.run_script", return_value=None), patch("agent.guardrail.fetch_earnings", return_value=None):
         result = check_trade("AAPL", "short put", "sell")
     assert result["requires_confirmation"] is True
 
 
 def test_check_trade_blocks_when_market_data_unavailable(fresh_db):
-    with patch("agent.guardrail.run_script", return_value=None):
+    with patch("agent.guardrail.run_script", return_value=None), patch("agent.guardrail.fetch_earnings", return_value=None):
         result = check_trade("AAPL", "short put", "sell")
 
     assert result["passed"] is False
@@ -222,7 +222,7 @@ def test_check_trade_all_green_passes(fresh_db):
             return ok_quote
         return []  # earnings_calendar returns empty list = no earnings
 
-    with patch("agent.guardrail.run_script", side_effect=dispatch):
+    with patch("agent.guardrail.run_script", side_effect=dispatch), patch("agent.guardrail.fetch_earnings", return_value=[]):
         result = check_trade("AAPL", "short put", "sell")
 
     assert result["passed"] is True
@@ -237,7 +237,7 @@ def test_check_trade_concentration_breach_blocks(fresh_db):
             return heavy_conc
         return None
 
-    with patch("agent.guardrail.run_script", side_effect=dispatch):
+    with patch("agent.guardrail.run_script", side_effect=dispatch), patch("agent.guardrail.fetch_earnings", return_value=[]):
         result = check_trade("AAPL", "short put", "sell")
 
     assert result["passed"] is False
@@ -250,7 +250,7 @@ def test_check_trade_third_roll_blocked(fresh_db):
         did = js.log_decision(tid, agent="risk", recommendation="Consider rolling the put")
         js.update_decision_outcome(did, user_action="taken", outcome="rolled")
 
-    with patch("agent.guardrail.run_script", return_value=None):
+    with patch("agent.guardrail.run_script", return_value=None), patch("agent.guardrail.fetch_earnings", return_value=[]):
         result = check_trade("TSLA", "short put", "sell")
 
     assert result["passed"] is False

@@ -2,16 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { spawnSync } from "child_process";
 import path from "path";
 
-const PROJECT_ROOT = path.join(process.env.HOME || "~", "Desktop/TradeMind_Agent");
+const PROJECT_ROOT =
+  process.env.TRADEMIND_ROOT ||
+  path.join(/* turbopackIgnore: true */ process.env.HOME || "~", "Desktop/TradeMind_Agent");
+const PYTHON =
+  process.env.TRADEMIND_PYTHON ||
+  path.join(/* turbopackIgnore: true */ PROJECT_ROOT, ".venv/bin/python");
 const PYTHONPATH =
   [
     PROJECT_ROOT,
     process.env.PYTHONPATH,
-    path.join(process.env.HOME || "~", "Desktop/AI量化/futures_quant/.venv/lib/python3.13/site-packages"),
+    path.join(/* turbopackIgnore: true */ process.env.HOME || "~", "Desktop/AI量化/futures_quant/.venv/lib/python3.13/site-packages"),
   ].filter(Boolean).join(":");
 
 function runAdvisor(payload: Record<string, unknown>) {
-  const child = spawnSync("python3", ["-m", "agent.loops.advisor_cli"], {
+  const child = spawnSync(PYTHON, ["-m", "agent.loops.advisor_cli"], {
     cwd: PROJECT_ROOT,
     env: { ...process.env, PYTHONPATH },
     input: JSON.stringify(payload),

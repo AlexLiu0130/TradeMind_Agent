@@ -1,6 +1,7 @@
 """
 Research Agent — market data, technicals, earnings for a ticker.
 """
+from agent.qveris_earnings import fetch_earnings
 from agent.tools import run_script, run_scripts_parallel
 
 
@@ -9,14 +10,14 @@ def gather(ticker: str, earnings_days: int = 45) -> dict:
     Collect market quote, technical indicators, and upcoming earnings for ticker.
     Returns a combined dict; any unavailable data section is None.
     """
-    quote, technicals, earnings = run_scripts_parallel(
+    quote, technicals = run_scripts_parallel(
         [
             ("market_quote.py", (ticker,), {}),
             ("technical_indicators.py", (ticker,), {}),
-            ("earnings_calendar.py", (ticker, "--days", str(earnings_days)), {}),
         ],
         runner=run_script,
     )
+    earnings = fetch_earnings([ticker], earnings_days)
 
     # Flatten single-item list responses
     if isinstance(quote, list) and len(quote) == 1:

@@ -22,6 +22,9 @@ const SCRIPTS = path.join(
   process.env.IBKR_SCRIPTS_DIR ||
     path.join(process.env.HOME || "~", "Desktop/ibkr-options-assistant/scripts"),
 );
+const PYTHON =
+  process.env.IBKR_PYTHON ||
+  path.join(process.env.HOME || "~", "Desktop/ibkr-options-assistant/.venv/bin/python");
 
 const PYTHONPATH =
   process.env.PYTHONPATH ||
@@ -29,7 +32,7 @@ const PYTHONPATH =
 
 function runStatusDashboard(): Record<string, unknown> | null {
   try {
-    const out = execFileSync("python3", [path.join(SCRIPTS, "status_dashboard.py"), "--output", "json"], {
+    const out = execFileSync(PYTHON, [path.join(SCRIPTS, "status_dashboard.py"), "--output", "json"], {
       env: { ...process.env, PYTHONPATH },
       timeout: 60000,
       stdio: ["ignore", "pipe", "ignore"],

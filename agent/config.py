@@ -30,6 +30,9 @@ _load_dotenv()
 IBKR_SCRIPTS_DIR = Path(
     os.environ.get("IBKR_SCRIPTS_DIR", "~/Desktop/ibkr-options-assistant/scripts")
 ).expanduser()
+IBKR_PYTHON = Path(
+    os.environ.get("IBKR_PYTHON", "~/Desktop/ibkr-options-assistant/.venv/bin/python")
+).expanduser()
 
 TRADEMIND_DB = Path(
     os.environ.get("TRADEMIND_DB", "~/Desktop/TradeMind_Agent/agent/db/trademind.db")
@@ -45,11 +48,12 @@ KNOWLEDGE_DIRS = [
     _PROJECT_ROOT / "agent" / "knowledge",
 ]
 
-# LLM provider — OpenAI-compatible Responses API (sssaicode Codex channel).
+# LLM provider — OpenAI-compatible API. DeepSeek uses Chat Completions;
+# OpenAI-compatible reasoning providers can use Responses.
 # The API key is read from OPENAI_API_KEY at runtime (never hard-coded here).
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5.4")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "deepseek-v4-flash")
 OPENAI_BASE_URL = os.environ.get(
-    "OPENAI_BASE_URL", "https://node-cf.sssaicodeapi.com/api/v1"
+    "OPENAI_BASE_URL", "https://api.deepseek.com"
 )
 # Reasoning models burn output tokens on hidden reasoning; keep the budget generous.
 OPENAI_MAX_OUTPUT_TOKENS = int(os.environ.get("OPENAI_MAX_OUTPUT_TOKENS", "8000"))

@@ -1,7 +1,7 @@
 import { getDb, getWriteDb } from "@/lib/db";
 import { analyzeIntelText, emptyTickerSnapshot, type TickerSnapshot } from "@/lib/intel";
+import { fetchQuotes } from "@/lib/quotes";
 import { NextRequest, NextResponse } from "next/server";
-import { execFileSync } from "child_process";
 import { randomUUID } from "crypto";
 import { mkdirSync, writeFileSync } from "fs";
 import path from "path";
@@ -10,15 +10,6 @@ const PROJECT_ROOT =
   process.env.TRADEMIND_ROOT ||
   path.join(/* turbopackIgnore: true */ process.env.HOME || "~", "Desktop/TradeMind_Agent");
 const MEDIA_DIR = path.join(/* turbopackIgnore: true */ PROJECT_ROOT, "agent/db/intel_media");
-const SCRIPTS = path.join(
-  process.env.IBKR_SCRIPTS_DIR ||
-    path.join(/* turbopackIgnore: true */ process.env.HOME || "~", "Desktop/ibkr-options-assistant/scripts"),
-);
-const PYTHONPATH =
-  process.env.PYTHONPATH ||
-  path.join(/* turbopackIgnore: true */ process.env.HOME || "~", "Desktop/AI量化/futures_quant/.venv/lib/python3.13/site-packages");
-const QUOTE_LIMIT = 16;
-
 function parseJson(value: unknown) {
   if (typeof value !== "string" || value === "") return null;
   try {
@@ -70,44 +61,9 @@ function ensureIntelSchema(db: ReturnType<typeof getWriteDb>) {
   }
 }
 
-function runQuotes(tickers: string[]): Record<string, number> {
-  const selected = [...new Set(tickers.map((t) => t.toUpperCase()).filter(Boolean))].slice(0, QUOTE_LIMIT);
-  if (selected.length === 0) return {};
-  try {
-    const out = execFileSync("python3", [path.join(SCRIPTS, "market_quote.py"), ...selected], {
-      env: { ...process.env, PYTHONPATH },
-      timeout: 35000,
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    return extractPrices(JSON.parse(out.toString()));
-  } catch {
-    return {};
-  }
-}
-
-function extractPrices(data: unknown): Record<string, number> {
-  const prices: Record<string, number> = {};
-  const visit = (value: unknown, keyHint?: string) => {
-    if (!value || typeof value !== "object") return;
-    if (Array.isArray(value)) {
-      for (const item of value) visit(item);
-      return;
-    }
-    const obj = value as Record<string, unknown>;
-    const sym = String(obj.symbol || obj.ticker || obj.underlying || keyHint || "").toUpperCase();
-    const price = Number(obj.last || obj.last_price || obj.price || obj.market_price || obj.close || obj.mid);
-    if (sym && Number.isFinite(price) && price > 0) prices[sym] = price;
-    for (const [k, v] of Object.entries(obj)) {
-      if (v && typeof v === "object") visit(v, k.toUpperCase());
-    }
-  };
-  visit(data);
-  return prices;
-}
-
-function buildTickerSnapshot(tickers: string[]): Record<string, TickerSnapshot> {
+async function buildTickerSnapshot(tickers: string[]): Promise<Record<string, TickerSnapshot>> {
   const pending = emptyTickerSnapshot(tickers);
-  const quotes = runQuotes(tickers);
+  const quotes = await fetchQuotes(tickers);
   for (const t of tickers) {
     const current = quotes[t];
     if (current) pending[t] = { baseline: current, current, since_pct: 0, source: "quote" };
@@ -115,10 +71,10 @@ function buildTickerSnapshot(tickers: string[]): Record<string, TickerSnapshot> 
   return pending;
 }
 
-function refreshTickerSnapshot(raw: unknown, quotes?: Record<string, number>): Record<string, TickerSnapshot> {
+function refreshTickerSnapshot(raw: unknown, quotes: Record<string, number> = {}): Record<string, TickerSnapshot> {
   const snap = (raw && typeof raw === "object" ? raw : {}) as Record<string, TickerSnapshot>;
   const tickers = Object.keys(snap);
-  const priceMap = quotes ?? runQuotes(tickers);
+  const priceMap = quotes;
   const next: Record<string, TickerSnapshot> = {};
   for (const t of tickers) {
     const old = snap[t] || { baseline: null, current: null, since_pct: null, source: "pending" };
@@ -245,7 +201,7 @@ export async function GET(req: NextRequest) {
     ...new Set(parsedRows.flatMap((r) => Object.keys(r.tickerSnapshot))),
   ];
   const refreshQuotes = req.nextUrl.searchParams.get("fresh") === "1";
-  const quotes = refreshQuotes ? runQuotes(quoteTickers) : {};
+  const quotes = refreshQuotes ? await fetchQuotes(quoteTickers) : {};
   const items = parsedRows.map(({ row: r, relatedTickers, portfolioOverlap, tickerSnapshot }) => ({
     ...r,
     related_tickers: relatedTickers,
@@ -270,7 +226,7 @@ export async function POST(req: NextRequest) {
   const sourceHandle = body.source_handle.replace(/^@/, "").trim() || "aleabitoreddit";
   const captureMethod = body.capture_method.trim() || "manual";
   const analysis = analyzeIntelText(rawText);
-  const tickerSnapshot = buildTickerSnapshot(analysis.related_tickers);
+  const tickerSnapshot = await buildTickerSnapshot(analysis.related_tickers);
 
   try {
     const db = getWriteDb();

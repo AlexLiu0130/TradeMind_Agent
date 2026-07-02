@@ -12,11 +12,14 @@ from agent.journal_store import get_thesis, list_decisions, log_decision
 SCRIPTS_DIR = Path(
     os.environ.get("IBKR_SCRIPTS_DIR", "~/Desktop/ibkr-options-assistant/scripts")
 ).expanduser()
+IBKR_PYTHON = Path(
+    os.environ.get("IBKR_PYTHON", "~/Desktop/ibkr-options-assistant/.venv/bin/python")
+).expanduser()
 
 
 def _run(script: str, *args) -> dict | list | None:
     """Call an IBKR script and parse its stdout as JSON. Logs go to stderr (not captured)."""
-    cmd = ["python3", str(SCRIPTS_DIR / script), *args]
+    cmd = [str(IBKR_PYTHON), str(SCRIPTS_DIR / script), *args]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     if result.returncode != 0 or not result.stdout.strip():
         return None

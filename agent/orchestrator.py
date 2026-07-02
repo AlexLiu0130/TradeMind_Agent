@@ -57,6 +57,24 @@ _SYSTEM_PROMPT = _load_system_prompt()
 _RESPONSES_TOOLS = responses_schema()
 
 
+def _use_chat_completions() -> bool:
+    return "deepseek" in OPENAI_BASE_URL.lower() or OPENAI_MODEL.startswith("deepseek")
+
+
+def _chat_tools() -> list[dict]:
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": tool["name"],
+                "description": tool["description"],
+                "parameters": tool["parameters"],
+            },
+        }
+        for tool in _RESPONSES_TOOLS
+    ]
+
+
 def _dispatch(tool_name: str, tool_input: dict) -> dict:
     return dispatch(tool_name, tool_input)
 
@@ -120,6 +138,9 @@ def run(request: str, ticker: str | None = None) -> dict:
     client = openai.OpenAI(base_url=OPENAI_BASE_URL)
     # The dashboard sends a focus ticker separately; surface it to the model.
     user_content = f"{request}\n\n[Primary ticker: {ticker.upper()}]" if ticker else request
+    if _use_chat_completions() and hasattr(client, "chat"):
+        return _run_chat_completions(client, request, user_content, ticker)
+
     # Responses API conversation state, accumulated statelessly (no previous_response_id,
     # so it works through proxies that don't persist responses server-side).
     conversation: list = [{"role": "user", "content": user_content}]
@@ -193,6 +214,68 @@ def run(request: str, ticker: str | None = None) -> dict:
         recommendation=json.dumps(output, ensure_ascii=False, default=str),
     )
 
+    return output
+
+
+def _run_chat_completions(client, request: str, user_content: str, ticker: str | None = None) -> dict:
+    messages: list[dict] = [
+        {"role": "system", "content": _SYSTEM_PROMPT},
+        {"role": "user", "content": user_content},
+    ]
+    tool_results: dict = {}
+    budget_s = float(os.environ.get("AGENT_BUDGET_S", "70"))
+    start = time.monotonic()
+    final_text = ""
+
+    for iterations in range(10):
+        over_budget = time.monotonic() - start > budget_s
+        offer_tools = not over_budget and iterations < 9
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=messages,
+            tools=_chat_tools() if offer_tools else None,
+            max_tokens=OPENAI_MAX_OUTPUT_TOKENS,
+            extra_body={"thinking": {"type": "disabled"}},
+        )
+        message = response.choices[0].message
+        calls = message.tool_calls or []
+        if not calls:
+            final_text = message.content or ""
+            break
+
+        messages.append(message.model_dump())
+        parsed_calls = [
+            (tc, json.loads(tc.function.arguments) if tc.function.arguments else {})
+            for tc in calls
+        ]
+        with ThreadPoolExecutor(max_workers=min(len(parsed_calls), 8)) as pool:
+            futures = [pool.submit(_dispatch, tc.function.name, tool_input) for tc, tool_input in parsed_calls]
+            round_results = [future.result() for future in futures]
+
+        for (tc, _tool_input), result in zip(parsed_calls, round_results, strict=True):
+            tool_results[_tool_result_key(tool_results, tc.function.name)] = result
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc.id,
+                "content": json.dumps(result, ensure_ascii=False, default=str),
+            })
+
+    if not final_text:
+        final_text = "[分析未能在时限内完成，请缩小问题范围后重试。]"
+
+    if _looks_like_trade_intent(user_content) and not _has_tool_result(tool_results, "check_guardrail"):
+        tool_results["check_guardrail"] = _missing_guardrail_result(request, ticker)
+        final_text = (
+            f"{final_text}\n\n[安全门禁] 检测到交易意图，但模型没有完成 check_guardrail。"
+            "系统已阻断任何下单/暂存建议，请重新提供 ticker、结构和方向后再评估。"
+        )
+
+    output = _build_output(final_text, tool_results)
+    log_decision(
+        thesis_id=None,
+        agent="orchestrator",
+        recommendation=json.dumps(output, ensure_ascii=False, default=str),
+    )
     return output
 
 

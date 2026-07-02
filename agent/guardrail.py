@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from concurrent.futures import ThreadPoolExecutor
 
+from agent.qveris_earnings import fetch_earnings
 from agent.journal_store import all_rules, list_decisions, list_theses
 from agent.tools import run_script
 
@@ -102,7 +103,7 @@ def _check_iv(ticker: str, direction: str) -> dict:
 
 def _check_earnings(ticker: str, rules: dict) -> dict:
     block_days = _safe_int(rules, "block_earnings_within_days", 2)
-    data = run_script("earnings_calendar.py", ticker, "--days", str(block_days))
+    data = fetch_earnings([ticker], block_days)
     blocking = data is None
     conclusion = f"Earnings: none within {block_days} days"
     if data is None:

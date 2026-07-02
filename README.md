@@ -11,7 +11,7 @@
 
 - **本项目不构成投资建议。** 所有分析、Greeks、概率均为信息参考，盈亏自负。
 - **永不自动交易。** Agent 只能*建议*和*暂存待确认*订单；唯一能下单的是 IBKR skill 的 `trade.py`，需 `IBKR_TRADING_ENABLED=1` + `--confirm-trade` 双闸门，由**你本人**显式执行。先用**模拟盘**（`IBKR_PORT=4002`）验证。
-- **第三方 LLM 代理 = 数据出境。** 默认 LLM 走 sssaicode 代理（OpenAI 兼容）。**Agent 对话时，你的真实持仓 / Greeks / 组合数据会被发送到该第三方服务器。** 不接受此数据流的话，请改用自托管或官方直连的 key（见[配置](#配置)）。
+- **第三方 LLM / 数据服务 = 数据出境。** Agent 对话会把问题和必要的持仓 / Greeks / 组合数据发送到你配置的 OpenAI 兼容模型；Serenity 同步会通过 QVeris 拉取 X 数据。不接受此数据流的话，请关闭对应 key 或改用自托管方案。
 - **API key 自行保管。** key 存于 `.env`（已被 git 忽略、`chmod 600`），切勿提交。
 - **行情订阅限制。** 无期权行情订阅时 IBKR 不下发 Greeks（Error 10091）；Dashboard 会用本地 Black-Scholes 估算并明确标注 `est`，或标 `OPT N/A`，绝不用 0 冒充。
 
@@ -118,10 +118,11 @@ chmod 600 .env
 `.env` 关键项：
 
 ```bash
-OPENAI_API_KEY=sk-...                                   # 必填
-OPENAI_BASE_URL=https://node-cf.sssaicodeapi.com/api/v1 # OpenAI 兼容端点；官方直连留空
-OPENAI_MODEL=gpt-5.4                                    # 改这里即可换模型
-# IBKR_SCRIPTS_DIR / TRADEMIND_DB / TELEGRAM_* 可选
+OPENAI_API_KEY=sk-...                       # DeepSeek / OpenAI 兼容 key
+OPENAI_BASE_URL=https://api.deepseek.com
+OPENAI_MODEL=deepseek-v4-flash
+QVERIS_API_KEY=sk-...                       # Serenity X 数据同步
+# IBKR_SCRIPTS_DIR / IBKR_PYTHON / TRADEMIND_DB / TELEGRAM_* 可选
 ```
 
 ### 3. 启动 Dashboard
@@ -153,8 +154,7 @@ Dashboard 会自动从 `.env` 读取 LLM key（无需额外 export）。确保 I
 |---|---|
 | **Portfolio** | 顶部市场状态栏 + 注意力信号；事件时间线 + Agent Committee 主动建议卡；Market Trends（SPY/QQQ/SMH 归一化比较，1M~1Y）+ Market Regime（风险偏好/趋势/波动率/科技强弱/利率/广度 6 维评分）；实时市值 / 未实现盈亏 / 净 Delta / Theta；**Market Exposure**（多空美元敞口）；Greeks 当前值 + 7/30 日趋势 sparkline（缺数据时本地 BS 估算并标注）；逐仓位盈亏；P&L 历史 |
 | **Wheel** | 从实时 option positions 派生 Wheel legs，按 DTE / IV / ITM / P&L 标记 OK、Watch、Risk，并复用 Portfolio 缓存快速加载 |
-| **Gamma** | Dealer Gamma Exposure (GEX) 分析：Call Wall（阻力）/ Put Wall（支撑）/ Gamma Flip（多空切换价）/ 正负 Gamma 环境判断；支持 EOD 快照盘后复盘 |
-| **Intel** | Serenity 档案：按发帖时间排序，展示正文、中文解读、相关 ticker、细分行业、发帖基准价、最新价、至今涨跌幅；支持 HAR/JSON/TXT/截图导入 |
+| **Intel** | Serenity 档案：QVeris 自动同步 X 时间线，按发帖时间排序，展示正文、中文解读、相关 ticker、细分行业、发帖基准价、最新价、至今涨跌幅；支持 HAR/JSON/TXT/截图导入 |
 | **Trades** | 历史成交（Flex 导入），可按标的/类型筛选 |
 | **Analytics** | 按持有期/时段的胜率、按标的的已实现盈亏 |
 | **Thesis** | 交易假设日志：可新建、改状态（平仓/推翻/重开） |
@@ -190,11 +190,11 @@ ffmpeg -i docs/demo/.video_tmp/page@*.webm -c:v libx264 -pix_fmt yuv420p docs/de
 
 ### 当前内置数据
 
-- Serenity 档案当前内置 **2449** 条记录，覆盖 **2025-11-17 → 2026-06-09**。
+- Serenity 档案初始内置 **2449** 条记录，覆盖 **2025-11-17 → 2026-06-09**；本地可用 QVeris 继续增量同步。
 - 采集记录为 append-only：手动上传、HAR/JSON/TXT 导入、浏览器采集都会入库，不覆盖旧记录。
 - 历史价格缓存写入 `market_daily_prices`，当前已补齐 **2712 / 3586** 个 ticker 引用的 `baseline/current/since_pct`。
 - 未补齐的多为非标准、海外或不可映射 ticker；后续可通过 symbol 映射表继续补全。
-- Serenity 数据是项目内置样本；未来新增推文需要使用者自行导入或运行采集流程。
+- QVeris 同步脚本会按 X status id / 正文去重，append-only 入库。
 
 Fresh clone 后恢复内置样本库：
 
@@ -307,6 +307,10 @@ node --test --experimental-strip-types dashboard/lib/*.test.ts
 ```bash
 # 补齐 Serenity 发帖后的历史表现；可重复运行
 python3 -m agent.loops.backfill_serenity_prices
+
+# 从 QVeris 拉取 Serenity 最新/历史推文；默认增量，--resume 断点续拉
+python3 -m agent.loops.qveris_serenity_sync
+python3 -m agent.loops.qveris_serenity_sync --full --max-pages 0 --resume
 
 # 只扫描前 N 条，适合验证行情源是否可用
 python3 -m agent.loops.backfill_serenity_prices --limit 25

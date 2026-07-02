@@ -12,7 +12,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 from agent import cache
-from agent.config import IBKR_SCRIPTS_DIR
+from agent.config import IBKR_PYTHON, IBKR_SCRIPTS_DIR
 
 _INFLIGHT: dict[str, dict] = {}
 _INFLIGHT_LOCK = threading.Lock()
@@ -42,7 +42,7 @@ def run_script(script: str, *args, timeout: int = 60, ttl: float | None = None) 
         entry["event"].wait()
         return entry["result"]
 
-    cmd = ["python3", str(IBKR_SCRIPTS_DIR / script), *args]
+    cmd = [str(IBKR_PYTHON), str(IBKR_SCRIPTS_DIR / script), *args]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         if result.returncode != 0 or not result.stdout.strip():

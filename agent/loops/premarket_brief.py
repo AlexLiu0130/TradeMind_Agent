@@ -11,6 +11,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from agent.config import TRADEMIND_DB
+from agent.qveris_earnings import fetch_earnings
 from agent.journal_store import init_db, list_theses, should_fire
 from agent.tools import run_script
 
@@ -95,8 +96,9 @@ def main() -> None:
 
     daily = run_script("options_daily.py")
     dashboard = run_script("status_dashboard.py")
-    earnings = run_script("earnings_calendar.py", "--days", "1")
     open_theses = list_theses(status="open")
+    tickers = [t.get("ticker", "") for t in open_theses if isinstance(t, dict)]
+    earnings = fetch_earnings(tickers, 1) or []
 
     message = _format_brief(daily, dashboard, earnings, open_theses)
     _notify(message)

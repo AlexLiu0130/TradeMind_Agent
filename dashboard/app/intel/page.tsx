@@ -279,8 +279,9 @@ export default function IntelPage() {
         const current = map.get(ticker) || { ticker, meta: metaFor(ticker), overlap: false, refs: 0, latest: null, lastTs: 0 };
         current.refs += 1;
         current.overlap = current.overlap || item.portfolio_overlap.includes(ticker);
-        if (sortTime(item) >= current.lastTs) {
-          current.latest = item.ticker_snapshot?.[ticker] || current.latest;
+        const snap = item.ticker_snapshot?.[ticker];
+        if (snap?.since_pct != null && sortTime(item) >= current.lastTs) {
+          current.latest = snap;
           current.lastTs = sortTime(item);
         }
         map.set(ticker, current);

@@ -101,7 +101,8 @@ dashboard/               # Next.js 16 前端
 |---|---|
 | `OPENAI_API_KEY` | LLM 调用（OpenAI 兼容接口） |
 | `OPENAI_BASE_URL` | API 端点 |
-| `OPENAI_MODEL` | 默认 gpt-5.4 |
+| `OPENAI_MODEL` | 默认 deepseek-v4-flash |
+| `QVERIS_API_KEY` | QVeris 数据源（Serenity / 财报等非持仓、非价格数据） |
 | `IBKR_SCRIPTS_DIR` | ibkr-options-assistant skill 脚本路径 |
 | `TRADEMIND_DB` | SQLite 数据库路径 |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | 自主循环推送通知 |

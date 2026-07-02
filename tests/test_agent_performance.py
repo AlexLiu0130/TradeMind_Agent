@@ -14,13 +14,14 @@ def test_research_runs_independent_scripts_concurrently(monkeypatch):
         return {"script": script}
 
     monkeypatch.setattr("agent.agents.research.run_script", fake_run)
+    monkeypatch.setattr("agent.agents.research.fetch_earnings", lambda *_args, **_kwargs: [])
 
     start = time.perf_counter()
     out = research.gather("MRVL")
     elapsed = time.perf_counter() - start
 
     assert elapsed < 0.12
-    assert set(calls) == {"market_quote.py", "technical_indicators.py", "earnings_calendar.py"}
+    assert set(calls) == {"market_quote.py", "technical_indicators.py"}
     assert out["quote"]["script"] == "market_quote.py"
 
 

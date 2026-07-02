@@ -1,19 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { spawn } from "child_process";
-import path from "path";
+import { readFileSync } from "fs";
 
 // Project root = two levels up from dashboard/app/api/chat -> dashboard, then ..
+const HOME = process.env.HOME || "~";
 const PROJECT_ROOT =
   process.env.TRADEMIND_ROOT ||
-  path.join(process.env.HOME || "~", "Desktop/TradeMind_Agent");
+  "/Users/liuqiyu/Desktop/qveris/TradeMind_Agent";
 
 const SCRIPTS =
   process.env.IBKR_SCRIPTS_DIR ||
-  path.join(process.env.HOME || "~", "Desktop/ibkr-options-assistant/scripts");
+  `${HOME}/Desktop/ibkr-options-assistant/scripts`;
 
 // Python interpreter used to run the agent. Must have `openai` installed
 // (pip install -r requirements.txt). Override with TRADEMIND_PYTHON if needed.
-const PYTHON = process.env.TRADEMIND_PYTHON || "python3";
+const PYTHON =
+  process.env.TRADEMIND_PYTHON ||
+  `${PROJECT_ROOT}/.venv/bin/python`;
 
 // The agent's IBKR tools shell out to scripts that import `ib_async`, which lives
 // in the futures_quant venv. Put PROJECT_ROOT first (so `import agent` resolves),
@@ -21,15 +24,30 @@ const PYTHON = process.env.TRADEMIND_PYTHON || "python3";
 // positions/trades routes already use.
 const IB_SITE_PACKAGES =
   process.env.IBKR_PYTHONPATH ||
-  path.join(process.env.HOME || "~", "Desktop/AI量化/futures_quant/.venv/lib/python3.13/site-packages");
-const AGENT_PYTHONPATH = `${PROJECT_ROOT}${path.delimiter}${IB_SITE_PACKAGES}`;
+  `${HOME}/Desktop/AI量化/futures_quant/.venv/lib/python3.13/site-packages`;
+const AGENT_PYTHONPATH = `${PROJECT_ROOT}:${IB_SITE_PACKAGES}`;
 
-// gpt-5.4 is a reasoning model; a portfolio question can take several tool rounds,
+// A portfolio question can take several tool rounds,
 // each with its own IBKR Gateway round-trip. Give it generous headroom (override
 // with AGENT_TIMEOUT_MS). Async spawn keeps the Next event loop free meanwhile.
 // Backstop only — the agent enforces its own ~70s wall-clock budget and always
 // returns an answer well before this. Override with AGENT_TIMEOUT_MS.
 const TIMEOUT_MS = Number(process.env.AGENT_TIMEOUT_MS ?? "150000");
+
+function localEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  try {
+    for (const raw of readFileSync(`${process.cwd()}/.env.local`, "utf8").split(/\r?\n/)) {
+      const line = raw.trim();
+      if (!line || line.startsWith("#") || !line.includes("=")) continue;
+      const [key, ...rest] = line.split("=");
+      env[key.trim()] = rest.join("=").trim().replace(/^['"]|['"]$/g, "");
+    }
+  } catch {
+    // optional local env
+  }
+  return env;
+}
 
 interface AgentResult {
   error?: string;
@@ -39,8 +57,7 @@ interface AgentResult {
 function runAgent(message: string, ticker: string | null): Promise<AgentResult> {
   return new Promise((resolve) => {
     const child = spawn(PYTHON, ["-m", "agent.chat_cli"], {
-      cwd: PROJECT_ROOT,
-      env: { ...process.env, IBKR_SCRIPTS_DIR: SCRIPTS, PYTHONPATH: AGENT_PYTHONPATH },
+      env: { ...process.env, ...localEnv(), IBKR_SCRIPTS_DIR: SCRIPTS, PYTHONPATH: AGENT_PYTHONPATH },
     });
 
     let stdout = "";

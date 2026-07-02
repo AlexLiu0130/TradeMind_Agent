@@ -99,7 +99,7 @@ export function earningsToEvent(row: EarningsRow): DashboardEvent | null {
     detail: days != null ? `${days} 天后` : undefined,
     tickers: [row.symbol],
     severity,
-    source: "earnings_calendar",
+    source: "qveris",
   };
 }
 

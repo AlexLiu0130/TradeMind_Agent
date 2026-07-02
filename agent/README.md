@@ -9,8 +9,9 @@
 | `IBKR_SCRIPTS_DIR` | `~/Desktop/ibkr-options-assistant/scripts` | ibkr 只读脚本路径 |
 | `TRADEMIND_DB` | `~/Desktop/TradeMind_Agent/agent/db/trademind.db` | SQLite 数据库路径 |
 | `OPENAI_API_KEY` | — | LLM API 密钥（编排器需要）|
-| `OPENAI_BASE_URL` | `https://node-cf.sssaicodeapi.com/api/v1` | OpenAI 兼容端点（sssaicode Codex 渠道，走 Responses API）|
-| `OPENAI_MODEL` | `gpt-5.4` | 编排器使用的模型 |
+| `OPENAI_BASE_URL` | `https://api.deepseek.com` | OpenAI 兼容端点 |
+| `OPENAI_MODEL` | `deepseek-v4-flash` | 编排器使用的模型 |
+| `QVERIS_API_KEY` | — | QVeris 数据源密钥（Serenity / 财报等非持仓、非价格数据） |
 | `OPENAI_MAX_OUTPUT_TOKENS` | `8000` | 单次响应最大输出 token（推理模型需较大预算）|
 | `TELEGRAM_BOT_TOKEN` | — | Telegram 通知（P2 起需要）|
 | `TELEGRAM_CHAT_ID` | — | Telegram 目标 chat ID |

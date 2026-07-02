@@ -8,6 +8,7 @@ agent/db/*.sqlite
 
 # ── 运行时产物 ────────────────────────────────────────────
 agent/db/cache/
+agent/db/*_state.json
 agent/db/gex/
 agent/db/intel_media/
 agent/db/serenity_api_replay/
